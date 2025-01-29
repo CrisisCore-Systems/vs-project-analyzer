@@ -1,22 +1,14 @@
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using Microsoft.CodeAnalysis;
-
-namespace ProjectAnalyzer.Core
+public class ProjectAnalyzer
 {
-    public class CodeAnalyzer
+    // ...existing code...
+
+    public AnalysisResult Analyze(Project project)
     {
-        public async Task<AnalysisResult> AnalyzeProjectAsync(string projectPath)
-        {
-            // Implementation coming soon
-            throw new NotImplementedException();
-        }
+        // Implement the full analysis logic here
+        var result = new AnalysisResult();
+        // ...analysis logic...
+        return result;
     }
 
-    public record AnalysisResult(
-        Dictionary<string, FileMetrics> FileMetrics,
-        ProjectMetrics ProjectMetrics,
-        List<CodeIssue> Issues
-    );
+    // ...existing code...
 }
