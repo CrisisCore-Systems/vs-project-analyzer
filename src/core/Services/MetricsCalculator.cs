@@ -6,25 +6,36 @@ using System.Linq;
 
 public class MetricsCalculator
 {
+    private const int LongMethodThreshold = 50;
+    private const int HighComplexityThreshold = 10;
+
+    // Helper to count specific nodes
+    private int CountNodesOfType<T>(SyntaxNode root) where T : SyntaxNode
+    {
+        return root.DescendantNodes().OfType<T>().Count();
+    }
+
     public int CalculateLinesOfCode(SyntaxNode root)
     {
-        var text = root.GetText();
-        return text.Lines.Count;
+        return root.GetText().Lines.Count;
     }
 
     public int CalculateCyclomaticComplexity(SyntaxNode root)
     {
-        var complexity = 1; // Base complexity
+        int complexity = 1; // Base complexity
+        var nodeTypes = new[]
+        {
+            typeof(IfStatementSyntax),
+            typeof(SwitchStatementSyntax),
+            typeof(ForStatementSyntax),
+            typeof(ForEachStatementSyntax),
+            typeof(WhileStatementSyntax),
+            typeof(DoStatementSyntax),
+            typeof(CatchClauseSyntax),
+            typeof(ConditionalExpressionSyntax)
+        };
 
-        complexity += root.DescendantNodes().OfType<IfStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<SwitchStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<ForStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<ForEachStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<WhileStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<DoStatementSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<CatchClauseSyntax>().Count();
-        complexity += root.DescendantNodes().OfType<ConditionalExpressionSyntax>().Count();
-
+        complexity += nodeTypes.Sum(nodeType => CountNodesOfType<SyntaxNode>(root));
         return complexity;
     }
 
@@ -32,12 +43,10 @@ public class MetricsCalculator
     {
         var issues = new List<CodeIssue>();
 
-        // Detect long methods
-        var methodDeclarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
-        foreach (var method in methodDeclarations)
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
             var methodLines = method.GetText().Lines.Count;
-            if (methodLines > 50)
+            if (methodLines > LongMethodThreshold)
             {
                 issues.Add(new CodeIssue
                 {
@@ -47,26 +56,19 @@ public class MetricsCalculator
                     Severity = IssueSeverity.Medium
                 });
             }
+
+            var complexity = CalculateCyclomaticComplexity(method);
+            if (complexity > HighComplexityThreshold)
+            {
+                issues.Add(new CodeIssue
+                {
+                    FilePath = filePath,
+                    LineNumber = method.GetLocation().GetLineSpan().StartLinePosition.Line + 1,
+                    Message = $"Method '{method.Identifier}' has high cyclomatic complexity ({complexity})",
+                    Severity = IssueSeverity.High
+                });
+            }
         }
-
-        // Detect high cyclomatic complexity
-        var complexityIssues = root.DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Select(method => new
-            {
-                Method = method,
-                Complexity = CalculateCyclomaticComplexity(method)
-            })
-            .Where(x => x.Complexity > 10)
-            .Select(x => new CodeIssue
-            {
-                FilePath = filePath,
-                LineNumber = x.Method.GetLocation().GetLineSpan().StartLinePosition.Line + 1,
-                Message = $"Method '{x.Method.Identifier}' has high cyclomatic complexity ({x.Complexity})",
-                Severity = IssueSeverity.High
-            });
-
-        issues.AddRange(complexityIssues);
 
         return issues;
     }
